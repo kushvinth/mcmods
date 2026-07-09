@@ -3,5 +3,5 @@ loader: fabric
 instances: {}
 repo:
   remote: origin
-  url: https://github.com/kushvinth/mcmods.git
+  url: https://github.com/kushvinth/mcmod.git
   branch: main

@@ -44,8 +44,8 @@ fn auto_detect_version(state: &types::MinecraftState) -> String {
             if let Some(ref meta) = m.metadata {
                 if let Some(mc_constraint) = meta.depends.get("minecraft") {
                     // Extract version from constraints like >=1.21.11, ~1.21.11, 1.21.11
-                    let v = mc_constraint
-                        .trim_start_matches(|c: char| !c.is_ascii_digit() && c != '.');
+                    let v =
+                        mc_constraint.trim_start_matches(|c: char| !c.is_ascii_digit() && c != '.');
                     if !v.is_empty() && v.starts_with(|c: char| c.is_ascii_digit()) {
                         versions.push(v);
                     }
@@ -122,7 +122,7 @@ async fn cmd_status() -> Result<()> {
     let mc_dir = find_minecraft_dir(None)?;
     let state = discovery::scan_minecraft(&mc_dir)?;
     let config_dir = find_config_dir()?;
-    let lockfile = Lockfile::from_file(&config_dir.join("mcmods.lock.json"))?;
+    let lockfile = Lockfile::from_file(&config_dir.join("mcmod.lock.json"))?;
 
     println!("Minecraft directory: {}", state.minecraft_dir.display());
     println!("Instances: {}", state.instances.len());
@@ -163,10 +163,7 @@ async fn cmd_status() -> Result<()> {
                     .unwrap_or("?");
 
                 let status = if managed != "?" { "✓" } else { " " };
-                println!(
-                    "    {status} {name:<40} v{version:<20} {}",
-                    &m.sha1[..12]
-                );
+                println!("    {status} {name:<40} v{version:<20} {}", &m.sha1[..12]);
             }
         }
         println!();
@@ -197,7 +194,7 @@ async fn cmd_init(minecraft_dir: Option<PathBuf>, force: bool) -> Result<()> {
 
     let config_dir = find_config_dir()?;
     std::fs::create_dir_all(&config_dir)?;
-    let config_path = config_dir.join("mcmods.yaml");
+    let config_path = config_dir.join("mcmod.yaml");
     if config_path.exists() && !force {
         anyhow::bail!(
             "config already exists at {} (use --force to overwrite)",
@@ -242,7 +239,7 @@ async fn cmd_init(minecraft_dir: Option<PathBuf>, force: bool) -> Result<()> {
     config.to_file(&config_path)?;
 
     // Also create an initial lockfile
-    let lockfile_path = config_dir.join("mcmods.lock.json");
+    let lockfile_path = config_dir.join("mcmod.lock.json");
     let lockfile = lockfile::Lockfile {
         version: 1,
         minecraft_version: config.minecraft_version.clone(),
@@ -258,9 +255,9 @@ async fn cmd_init(minecraft_dir: Option<PathBuf>, force: bool) -> Result<()> {
     println!();
     println!("Next steps:");
     println!("  1. Edit {config_path:?} to declare your mods");
-    println!("  2. Run: mcmods update # resolve versions from Modrinth");
-    println!("  3. Run: mcmods plan   # see what would change");
-    println!("  4. Run: mcmods apply  # install/update/remove mods");
+    println!("  2. Run: mcmod update # resolve versions from Modrinth");
+    println!("  3. Run: mcmod plan   # see what would change");
+    println!("  4. Run: mcmod apply  # install/update/remove mods");
 
     Ok(())
 }
@@ -268,11 +265,12 @@ async fn cmd_init(minecraft_dir: Option<PathBuf>, force: bool) -> Result<()> {
 async fn cmd_plan(instance_filter: Option<String>) -> Result<()> {
     let mc_dir = find_minecraft_dir(None)?;
     let config_dir = find_config_dir()?;
-    let config_path = config_dir.join("mcmods.yaml");
-    let lockfile_path = config_dir.join("mcmods.lock.json");
+    let config_path = config_dir.join("mcmod.yaml");
+    let lockfile_path = config_dir.join("mcmod.lock.json");
 
-    let config = config::Config::from_file(&config_path)
-        .map_err(|_| anyhow::anyhow!("no config found at {config_path:?}. Run 'mcmods init' first"))?;
+    let config = config::Config::from_file(&config_path).map_err(|_| {
+        anyhow::anyhow!("no config found at {config_path:?}. Run 'mcmod init' first")
+    })?;
     let lockfile = Lockfile::from_file(&lockfile_path)?;
     let mut state = discovery::scan_minecraft(&mc_dir)?;
 
@@ -291,11 +289,12 @@ async fn cmd_plan(instance_filter: Option<String>) -> Result<()> {
 async fn cmd_apply(instance_filter: Option<String>) -> Result<()> {
     let mc_dir = find_minecraft_dir(None)?;
     let config_dir = find_config_dir()?;
-    let config_path = config_dir.join("mcmods.yaml");
-    let lockfile_path = config_dir.join("mcmods.lock.json");
+    let config_path = config_dir.join("mcmod.yaml");
+    let lockfile_path = config_dir.join("mcmod.lock.json");
 
-    let config = config::Config::from_file(&config_path)
-        .map_err(|_| anyhow::anyhow!("no config found at {config_path:?}. Run 'mcmods init' first"))?;
+    let config = config::Config::from_file(&config_path).map_err(|_| {
+        anyhow::anyhow!("no config found at {config_path:?}. Run 'mcmod init' first")
+    })?;
     let mut lockfile = Lockfile::from_file(&lockfile_path)?.unwrap_or_else(|| Lockfile {
         version: 1,
         minecraft_version: config.minecraft_version.clone(),
@@ -327,9 +326,9 @@ async fn cmd_apply(instance_filter: Option<String>) -> Result<()> {
     executor::execute_plan(&plan, &config, false).await?;
 
     // Update lockfile: remove stale paths, keep existing managed files
-    lockfile.managed_paths.retain(|path_str, _| {
-        std::path::Path::new(path_str).exists()
-    });
+    lockfile
+        .managed_paths
+        .retain(|path_str, _| std::path::Path::new(path_str).exists());
     // Re-scan and add any new managed files that match desired slugs
     let state_after = discovery::scan_minecraft(&mc_dir)?;
     for inst in &state_after.instances {
@@ -360,11 +359,12 @@ async fn cmd_apply(instance_filter: Option<String>) -> Result<()> {
 
 async fn cmd_update() -> Result<()> {
     let config_dir = find_config_dir()?;
-    let config_path = config_dir.join("mcmods.yaml");
-    let lockfile_path = config_dir.join("mcmods.lock.json");
+    let config_path = config_dir.join("mcmod.yaml");
+    let lockfile_path = config_dir.join("mcmod.lock.json");
 
-    let config = config::Config::from_file(&config_path)
-        .map_err(|_| anyhow::anyhow!("no config found at {config_path:?}. Run 'mcmods init' first"))?;
+    let config = config::Config::from_file(&config_path).map_err(|_| {
+        anyhow::anyhow!("no config found at {config_path:?}. Run 'mcmod init' first")
+    })?;
     let mut lockfile = Lockfile::from_file(&lockfile_path)?.unwrap_or_else(|| {
         println!("No lockfile found — creating new one.");
         Lockfile {
@@ -407,9 +407,12 @@ async fn resolve_and_store(
 ) {
     match executor::resolve_mod(slug, mc_version, loader, config).await {
         Ok((url, sha512, filename)) => {
-            let inst = lockfile.instances.entry(instance.to_string()).or_insert_with(|| lockfile::LockedInstance {
-                mods: std::collections::HashMap::new(),
-            });
+            let inst = lockfile
+                .instances
+                .entry(instance.to_string())
+                .or_insert_with(|| lockfile::LockedInstance {
+                    mods: std::collections::HashMap::new(),
+                });
             inst.mods.insert(
                 slug.to_string(),
                 lockfile::LockedMod {
@@ -435,13 +438,16 @@ async fn resolve_and_store(
 
 fn config_path() -> anyhow::Result<std::path::PathBuf> {
     let config_dir = find_config_dir()?;
-    Ok(config_dir.join("mcmods.yaml"))
+    Ok(config_dir.join("mcmod.yaml"))
 }
 
 async fn cmd_add(mod_slug: &str, instance: &str) -> Result<()> {
     let config_path = config_path()?;
     if !config_path.exists() {
-        anyhow::bail!("no config found at {:?}. Run 'mcmods init' first", config_path);
+        anyhow::bail!(
+            "no config found at {:?}. Run 'mcmod init' first",
+            config_path
+        );
     }
     let mut config = config::Config::from_file(&config_path)?;
 
@@ -464,7 +470,7 @@ async fn cmd_add(mod_slug: &str, instance: &str) -> Result<()> {
     config.to_file(&config_path)?;
     println!("  ✓ Added {mod_slug} to '{instance}'");
     println!();
-    println!("  Next: run 'mcmods update' to resolve versions, then 'mcmods apply'");
+    println!("  Next: run 'mcmod update' to resolve versions, then 'mcmod apply'");
 
     Ok(())
 }
@@ -488,15 +494,15 @@ async fn cmd_remove(mod_slug: &str, instance: &str) -> Result<()> {
     config.to_file(&config_path)?;
     println!("  ✓ Removed {mod_slug} from '{instance}'");
     println!();
-    println!("  Next: run 'mcmods apply' to remove from disk");
+    println!("  Next: run 'mcmod apply' to remove from disk");
 
     Ok(())
 }
 
 async fn cmd_list(instance_filter: Option<&str>) -> Result<()> {
     let config_dir = find_config_dir()?;
-    let config_path = config_dir.join("mcmods.yaml");
-    let lockfile_path = config_dir.join("mcmods.lock.json");
+    let config_path = config_dir.join("mcmod.yaml");
+    let lockfile_path = config_dir.join("mcmod.lock.json");
 
     if !config_path.exists() {
         anyhow::bail!("no config found at {:?}", config_path);
@@ -563,10 +569,7 @@ async fn cmd_search(query: &str) -> Result<()> {
         }
         println!(
             "  {:25} ⬇ {}  ★ {}  [{:.2}]",
-            "",
-            hit.downloads,
-            hit.follows,
-            hit.project_type
+            "", hit.downloads, hit.follows, hit.project_type
         );
         println!();
     }
@@ -579,7 +582,9 @@ async fn cmd_info(mod_slug: &str) -> Result<()> {
     println!();
 
     let project = crate::modrinth::get_project(mod_slug).await?;
-    let versions = crate::modrinth::get_all_versions(&project.id).await.unwrap_or_default();
+    let versions = crate::modrinth::get_all_versions(&project.id)
+        .await
+        .unwrap_or_default();
 
     println!("  Slug:        {}", project.slug);
     println!("  Title:       {}", project.title);
@@ -643,7 +648,7 @@ async fn cmd_rename(old: &str, new: &str, instance: &str) -> Result<()> {
     config.to_file(&config_path)?;
     println!("  ✓ Renamed '{old}' → '{new}' in '{instance}'");
     println!();
-    println!("  Next: run 'mcmods update' then 'mcmods apply'");
+    println!("  Next: run 'mcmod update' then 'mcmod apply'");
 
     Ok(())
 }
@@ -677,11 +682,35 @@ fn chrono_now() -> String {
     }
 
     let months_days: &[(i64, i64)] = if is_leap(y) {
-        &[(31, 0), (29, 31), (31, 60), (30, 91), (31, 121), (30, 152),
-          (31, 182), (31, 213), (30, 244), (31, 274), (30, 305), (31, 335)]
+        &[
+            (31, 0),
+            (29, 31),
+            (31, 60),
+            (30, 91),
+            (31, 121),
+            (30, 152),
+            (31, 182),
+            (31, 213),
+            (30, 244),
+            (31, 274),
+            (30, 305),
+            (31, 335),
+        ]
     } else {
-        &[(31, 0), (28, 31), (31, 59), (30, 90), (31, 120), (30, 151),
-          (31, 181), (31, 212), (30, 243), (31, 273), (30, 304), (31, 334)]
+        &[
+            (31, 0),
+            (28, 31),
+            (31, 59),
+            (30, 90),
+            (31, 120),
+            (30, 151),
+            (31, 181),
+            (31, 212),
+            (30, 243),
+            (31, 273),
+            (30, 304),
+            (31, 334),
+        ]
     };
 
     let mut month = 1;

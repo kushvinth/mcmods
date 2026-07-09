@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "mcmods", version, about = "Declarative Minecraft mod manager")]
+#[command(name = "mcmod", version, about = "Declarative Minecraft mod manager")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

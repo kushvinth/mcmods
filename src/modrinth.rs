@@ -105,7 +105,7 @@ pub async fn search_projects(query: &str) -> Result<Vec<SearchHit>> {
 
 fn client() -> reqwest::Client {
     reqwest::Client::builder()
-        .user_agent("mcmods/0.1.0 (github_user/mcmods)")
+        .user_agent("mcmod/0.1.2 (github_user/mcmod)")
         .build()
         .expect("failed to build HTTP client")
 }
@@ -205,7 +205,10 @@ pub fn guess_slug_from_filename(filename: &str) -> Option<String> {
         ("cloth config", "cloth-config"),
         ("herobot", "herobot"),
         ("natural motion blur", "natural-motion-blur"),
-        ("phase's discord rich presence", "phases-discord-rich-presence"),
+        (
+            "phase's discord rich presence",
+            "phases-discord-rich-presence",
+        ),
         ("status effect timer", "status-effect-timer"),
         ("totemcounter", "totemcounter"),
         ("totem tweaks", "totem-tweaks"),
@@ -268,9 +271,6 @@ mod tests {
             guess_slug_from_filename("fabric-api-0.141.3+1.21.11.jar"),
             Some("fabric-api".into())
         );
-        assert_eq!(
-            guess_slug_from_filename("unknown-mod-1.0.0.jar"),
-            None
-        );
+        assert_eq!(guess_slug_from_filename("unknown-mod-1.0.0.jar"), None);
     }
 }

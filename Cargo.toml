@@ -1,8 +1,10 @@
 [package]
-name = "mcmods"
-version = "0.1.0"
+name = "mcmod"
+version = "0.1.3"
 edition = "2024"
-description = "Declarative Minecraft mod manager for macOS"
+description = "Declarative Minecraft mod manager"
+license = "Apache-2.0"
+repository = "https://github.com/kushvinth/mcmod"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -22,5 +24,3 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["full"] }
 urlencoding = "2"
 tempfile = "3"
-
-
